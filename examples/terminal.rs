@@ -77,13 +77,18 @@ fn printboard(g: &Game) -> io::Result<()> {
             printone(n)?;
         }
     }
-
+    stdout().execute(cursor::MoveTo(1, 10))?;
+    write!(stdout(), "Arrows to move; 'b' to undo; Esc or 'q' to exit.")?;
+    stdout().execute(cursor::MoveTo(1, 11))?;
     Ok(())
 }
 
 fn main() -> io::Result<()> {
     let mut g = Game::new();
     let mut old_g = g.clone();
+    crossterm::terminal::enable_raw_mode()?;
+    stdout().execute(crossterm::cursor::Hide)?;
+
     loop {
         printboard(&g)?;
         if !g.can_move() {
@@ -126,8 +131,13 @@ fn main() -> io::Result<()> {
                 code: KeyCode::Esc,
                 kind: KeyEventKind::Press,
                 ..
+            })
+            | Event::Key(KeyEvent {
+                code: KeyCode::Char('q'),
+                kind: KeyEventKind::Press,
+                ..
             }) => {
-                return Ok(());
+                break;
             }
             Event::Key(KeyEvent {
                 code: KeyCode::Char('b'),
@@ -139,5 +149,9 @@ fn main() -> io::Result<()> {
             _ => {}
         }
     }
+    stdout().execute(crossterm::style::ResetColor)?;
+    stdout().execute(crossterm::cursor::Show)?;
+    crossterm::terminal::disable_raw_mode()?;
+    println!("\nexited");
     Ok(())
 }
