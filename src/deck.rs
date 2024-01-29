@@ -9,6 +9,13 @@ pub(crate) struct Deck {
 }
 
 impl Deck {
+    // Returns the number of 1s, 2s, and 3s.
+    pub fn counts(&self) -> [u32; 3] {
+        self.contents.iter().fold([0; 3], |mut acc, v| {
+            acc[(v - 1) as usize] = acc[(v - 1) as usize] + 1;
+            acc
+        })
+    }
     pub(crate) fn new(rng: &mut impl Rng) -> Self {
         Self {
             contents: Self::newv(rng),

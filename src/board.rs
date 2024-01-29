@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 /// A board for threes, holding the Board currently in play and allowing its
 /// manipulation.  Board::default() provides an empty board.
 #[derive(Copy, Default, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Board([u32; 16], u32);
+pub struct Board(pub [u32; 16], pub u32);
 
 impl std::fmt::Display for Board {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -81,6 +81,9 @@ impl Board {
     pub(crate) fn set(&mut self, pos: usize, c: u32) -> bool {
         if pos < 16 && self.0[pos] == 0 {
             self.0[pos] = c;
+            if c > self.1 {
+                self.1 = c;
+            }
             return true;
         }
         false
@@ -92,23 +95,28 @@ impl Board {
     // Squish the elements described by the array to the left.  Returns
     // Some(x[3]) if the items were shifted or None if not.
     fn squish(&mut self, x: &[usize; 4]) -> Option<usize> {
-        let mut shift = false;
+        let mut shiftable = false;
+        let mut shifted = false;
         for i in 0..3 {
             let idx = x[i];
             let idxp1 = x[i + 1];
-            if self.0[idx] == 0 || shift {
+            if shiftable || self.0[idx] == 0 {
+                if self.0[idxp1] != 0 {
+                    shifted = true;
+                }
                 self.0[idx] = self.0[idxp1];
-                shift = true;
+                shiftable = true;
             } else if combines(self.0[idx], self.0[idxp1]) {
                 let v = self.0[idx] + self.0[idxp1];
                 if v > self.1 {
                     self.1 = v;
                 }
                 self.0[idx] = v;
-                shift = true;
+                shifted = true;
+                shiftable = true;
             }
         }
-        if shift {
+        if shifted {
             self.0[x[3]] = 0;
             return Some(x[3]);
         }
@@ -123,7 +131,7 @@ mod tests {
     #[test]
     fn left() {
         let mut b = Board([3, 0, 1, 2, 6, 6, 1, 2, 12, 6, 3, 1, 0, 3, 6, 6], 12);
-        b.left();
+        assert_eq!(b.left(), vec![3, 7, 15]);
 
         let want = Board([3, 1, 2, 0, 12, 1, 2, 0, 12, 6, 3, 1, 3, 6, 6, 0], 12);
         assert_eq!(b, want);
@@ -132,7 +140,7 @@ mod tests {
     #[test]
     fn right() {
         let mut b = Board([3, 0, 1, 2, 6, 6, 1, 3, 12, 6, 3, 1, 0, 3, 6, 6], 12);
-        b.right();
+        assert_eq!(b.right(), vec![0, 4, 12]);
 
         let want = Board([0, 3, 0, 3, 0, 12, 1, 3, 12, 6, 3, 1, 0, 0, 3, 12], 12);
         assert_eq!(b, want);
@@ -141,7 +149,7 @@ mod tests {
     #[test]
     fn up() {
         let mut b = Board([3, 0, 1, 2, 6, 6, 1, 1, 12, 6, 3, 3, 12, 3, 6, 6], 12);
-        b.up();
+        assert_eq!(b.up(), vec![12, 13, 15]);
 
         let want = Board([3, 6, 1, 3, 6, 6, 1, 3, 24, 3, 3, 6, 0, 0, 6, 0], 24);
         assert_eq!(b, want);
@@ -150,11 +158,16 @@ mod tests {
     #[test]
     fn down() {
         let mut b = Board([3, 0, 1, 2, 6, 6, 1, 1, 12, 6, 3, 3, 12, 3, 6, 6], 12);
-        b.down();
+        assert_eq!(b.down(), vec![0, 1, 3]);
 
         let want = Board([0, 0, 1, 0, 3, 0, 1, 3, 6, 12, 3, 3, 24, 3, 6, 6], 24);
         assert_eq!(b, want);
         assert!(b.can_move());
+    }
+    #[test]
+    fn down_bug() {
+        let mut b = Board([1, 0, 2, 0, 6, 0, 0, 1, 12, 3, 6, 0, 3072, 12, 6, 2], 3072);
+        assert_eq!(b.down(), vec![2, 3]);
     }
     #[test]
     fn can_move() {

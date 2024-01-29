@@ -32,6 +32,7 @@ impl Game {
             g: VecDeque::from([false; 21]),
             next: RefCell::default(),
         };
+        s.b.set(12, 3072);
         // Deal out 8 cards into random spots; do not advance giants.
         for _ in 0..8 {
             let c = s.d.next(&mut s.rng);
@@ -40,14 +41,14 @@ impl Game {
         s.next = RefCell::new(Rc::new(vec![s.d.next(&mut s.rng)]));
         s
     }
-    fn new_giant(&mut self) -> VecDeque<bool> {
+    fn new_giant(&mut self) {
         let mut v = vec![false; 21];
         v[self.rng.gen_range(0..21)] = true;
-        VecDeque::from(v)
+        self.g = VecDeque::from(v);
     }
     fn check_giant(&mut self) -> Option<Vec<u32>> {
         if self.g.len() == 0 {
-            self.g = self.new_giant();
+            self.new_giant();
         }
         if !self.g.pop_back().unwrap() {
             return None;
@@ -58,7 +59,7 @@ impl Game {
             48 => return Some(vec![6]),
             96 => return Some(vec![6, 12]),
             _ => {
-                let f = self.rng.gen_range(0..m / 192);
+                let f = self.rng.gen_range(0..=(m / 96).ilog(2));
                 let low = 6 * (2u32.pow(f));
                 Some(vec![low, low * 2, low * 4])
             }
@@ -80,7 +81,7 @@ impl Game {
     pub fn board(&self) -> Board {
         self.b
     }
-    fn can_move(&self) -> bool {
+    pub fn can_move(&self) -> bool {
         self.b.can_move()
     }
     fn finish(&mut self, open: Vec<usize>) -> Result<Rc<Vec<u32>>, Error> {
