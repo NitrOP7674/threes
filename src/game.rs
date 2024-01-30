@@ -1,7 +1,7 @@
 use rand::prelude::*;
 use rand_pcg::Pcg32;
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{board::Board, deck::Deck};
 
@@ -10,7 +10,7 @@ pub struct Game {
     rng: Box<Pcg32>,
     b: Board,
     d: Deck,
-    g: VecDeque<bool>,
+    g: Vec<bool>,
     next: RefCell<Rc<Vec<u32>>>,
 }
 
@@ -21,7 +21,7 @@ pub enum Error {
 }
 
 impl Game {
-    pub fn new() -> Self {
+    pub fn new(boost: u32, boostpos: usize) -> Self {
         let mut rng = Pcg32::from_entropy();
         let d = Deck::new(&mut rng);
         let mut s = Self {
@@ -29,9 +29,13 @@ impl Game {
             b: Board::default(),
             d: d,
             // When starting a new game, the giant deck is 21 blanks.
-            g: VecDeque::from([false; 21]),
+            g: vec![false; 21],
             next: RefCell::default(),
         };
+        s.b.0[boostpos] = boost;
+        if boost == 0 {
+            s.new_giant();
+        }
         // Deal out 8 cards into random spots; do not advance giants.
         for _ in 0..8 {
             let c = s.d.next(&mut s.rng);
@@ -40,16 +44,22 @@ impl Game {
         s.next = RefCell::new(Rc::new(vec![s.d.next(&mut s.rng)]));
         s
     }
+    /// Replaces the rng in the game with a new one and shuffles all the
+    /// unknowns (deck, giant position).
+    pub fn rerand(&mut self) {
+        self.rng = Box::new(Pcg32::from_entropy());
+        self.d.contents.shuffle(&mut self.rng);
+        self.g.shuffle(&mut self.rng);
+    }
     fn new_giant(&mut self) {
-        let mut v = vec![false; 21];
-        v[self.rng.gen_range(0..21)] = true;
-        self.g = VecDeque::from(v);
+        self.g = vec![false; 21];
+        self.g[self.rng.gen_range(0..21)] = true;
     }
     fn check_giant(&mut self) -> Option<Vec<u32>> {
         if self.g.len() == 0 {
             self.new_giant();
         }
-        if !self.g.pop_back().unwrap() {
+        if !self.g.pop().unwrap() {
             return None;
         }
         let m = self.b.max_val();
@@ -58,7 +68,7 @@ impl Game {
             48 => return Some(vec![6]),
             96 => return Some(vec![6, 12]),
             _ => {
-                let f = self.rng.gen_range(0..=(m / 96).ilog(2));
+                let f = self.rng.gen_range(0..=((m / 192).ilog(2)));
                 let low = 6 * (2u32.pow(f));
                 Some(vec![low, low * 2, low * 4])
             }

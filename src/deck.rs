@@ -1,11 +1,10 @@
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 
 use rand::prelude::*;
 
 #[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub(crate) struct Deck {
-    contents: VecDeque<u32>,
+    pub(crate) contents: Vec<u32>,
 }
 
 impl Deck {
@@ -21,16 +20,16 @@ impl Deck {
             contents: Self::newv(rng),
         }
     }
-    fn newv(rng: &mut impl Rng) -> VecDeque<u32> {
+    fn newv(rng: &mut impl Rng) -> Vec<u32> {
         let mut v = vec![1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3];
         v.shuffle(rng);
-        VecDeque::from(v)
+        v
     }
     pub(crate) fn next(&mut self, rng: &mut impl Rng) -> u32 {
         if self.contents.len() == 0 {
             self.contents = Self::newv(rng);
         }
-        VecDeque::pop_back(&mut self.contents).unwrap()
+        self.contents.pop().unwrap()
     }
 }
 

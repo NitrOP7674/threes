@@ -84,7 +84,7 @@ fn printboard(g: &Game) -> io::Result<()> {
 }
 
 fn main() -> io::Result<()> {
-    let mut g = Game::new();
+    let mut g = Game::new(192, 12);
     let mut old_g = g.clone();
     crossterm::terminal::enable_raw_mode()?;
     stdout().execute(crossterm::cursor::Hide)?;

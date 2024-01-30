@@ -300,6 +300,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "threes-ai-mc"
+version = "0.1.0"
+dependencies = [
+ "crossterm",
+ "rand",
+ "threes",
+]
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
