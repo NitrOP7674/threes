@@ -28,12 +28,13 @@ impl Game {
             rng: Box::new(rng),
             b: Board::default(),
             d: d,
-            // When starting a new game, the giant deck is 21 blanks.
+            // When starting a new game with boost, the giant deck is 21 blanks.
             g: vec![false; 21],
             next: RefCell::default(),
         };
-        s.b.0[boostpos] = boost;
+        s.b.set(boostpos, boost);
         if boost == 0 {
+            // No boost, so create giant deck.
             s.new_giant();
         }
         // Deal out 8 cards into random spots; do not advance giants.

@@ -94,7 +94,7 @@ enum Move {
     Right,
 }
 
-const ITERS: i32 = 10000;
+const ITERS: i32 = 20000;
 
 fn score(g: Game, mv: Move) -> i32 {
     let mut avg = 0;
@@ -123,7 +123,7 @@ fn score(g: Game, mv: Move) -> i32 {
         let c = run(&mut g);
         if i % 100 == 50 {
             stdout().execute(cursor::MoveTo(15, 12)).ok();
-            write!(stdout(), "score={}...", avg / i + worst / 2 + best / 2).ok();
+            write!(stdout(), "score={}...", avg / i + worst * 2).ok();
         }
         avg += c;
         if c > best {
@@ -133,7 +133,7 @@ fn score(g: Game, mv: Move) -> i32 {
             worst = c;
         }
     }
-    avg / ITERS + worst * 10 + best
+    avg / ITERS + worst * 2
 }
 
 fn run(g: &mut Game) -> i32 {
