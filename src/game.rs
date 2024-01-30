@@ -32,7 +32,6 @@ impl Game {
             g: VecDeque::from([false; 21]),
             next: RefCell::default(),
         };
-        s.b.set(12, 3072);
         // Deal out 8 cards into random spots; do not advance giants.
         for _ in 0..8 {
             let c = s.d.next(&mut s.rng);
