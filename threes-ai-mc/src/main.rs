@@ -8,7 +8,11 @@ use crossterm::{
 use rand::prelude::*;
 use threes::game::{self, Game};
 
-use std::io::{self, stdout, Write};
+use std::{
+    io::{self, stdout, Write},
+    sync::{atomic::AtomicBool, Arc},
+    thread,
+};
 
 fn printone(n: u32) -> io::Result<()> {
     match n {
@@ -47,7 +51,7 @@ fn printone(n: u32) -> io::Result<()> {
     Ok(())
 }
 
-fn printboard(g: &Game, mv: Option<Move>, best: i32) -> io::Result<()> {
+fn printboard(g: &Game, mv: Option<Move>, best: f32) -> io::Result<()> {
     stdout().execute(cursor::MoveTo(1, 1))?;
     write!(stdout(), "Next: ")?;
     match g.next().as_slice() {
@@ -78,7 +82,7 @@ fn printboard(g: &Game, mv: Option<Move>, best: i32) -> io::Result<()> {
     }
     if mv.is_some() {
         stdout().execute(cursor::MoveTo(1, 8))?;
-        write!(stdout(), "Moved {:?} ({})", mv.unwrap(), best)?;
+        write!(stdout(), "Moved {:?} ({:5.1})", mv.unwrap(), best)?;
     }
     stdout().execute(cursor::MoveTo(1, 10))?;
     write!(stdout(), "Esc or 'q' to exit.")?;
@@ -94,11 +98,10 @@ enum Move {
     Right,
 }
 
-const ITERS: i32 = 20000;
+const ITERS: i32 = 100000;
 
-fn score(g: Game, mv: Move) -> i32 {
-    let mut avg = 0;
-    let mut best = 0;
+fn score(g: Game, mv: Move) -> f32 {
+    let mut avg = 0f32;
     let mut worst = 9999;
     let backup = g.clone();
     for i in 0..ITERS {
@@ -112,10 +115,10 @@ fn score(g: Game, mv: Move) -> i32 {
         };
         match res {
             Err(game::Error::IllegalMove) => {
-                return 0;
+                return 0.0;
             }
             Err(game::Error::GameOver) => {
-                avg += 1;
+                avg += 1.0;
                 continue;
             }
             _ => {}
@@ -123,17 +126,14 @@ fn score(g: Game, mv: Move) -> i32 {
         let c = run(&mut g);
         if i % 100 == 50 {
             stdout().execute(cursor::MoveTo(15, 12)).ok();
-            write!(stdout(), "score={}...", avg / i + worst * 2).ok();
+            write!(stdout(), "score={:5.1}...", (avg / i as f32) + worst as f32).ok();
         }
-        avg += c;
-        if c > best {
-            best = c;
-        }
+        avg += c as f32;
         if c < worst {
             worst = c;
         }
     }
-    avg / ITERS + worst * 2
+    (avg / (ITERS as f32)) + worst as f32
 }
 
 fn run(g: &mut Game) -> i32 {
@@ -161,15 +161,27 @@ fn main() -> io::Result<()> {
     stdout().execute(crossterm::cursor::Hide)?;
 
     let mut mv: Option<Move> = None;
-    let mut best: i32 = 0;
-    'outer: loop {
+    let mut best = 0.0;
+    let stop = Arc::new(AtomicBool::new(false));
+    let shared_stop = stop.clone();
+    let _ = thread::spawn(move || loop {
+        let r = read().unwrap();
+        let Event::Key(KeyEvent { kind, code, .. }) = r else {
+            continue;
+        };
+        if kind == KeyEventKind::Press && code == KeyCode::Esc || code == KeyCode::Char('q') {
+            shared_stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            return;
+        }
+    });
+    while !stop.load(std::sync::atomic::Ordering::Relaxed) {
         stdout().execute(Clear(ClearType::All))?;
         printboard(&g, mv, best)?;
         if !g.can_move() {
             break;
         }
         mv = None;
-        best = 0;
+        best = 0.0;
         let sc = score(g.clone(), Move::Up);
         stdout().execute(cursor::MoveTo(1, 12))?;
         write!(stdout(), "UP: {}", sc)?;
@@ -177,14 +189,14 @@ fn main() -> io::Result<()> {
             best = sc;
             mv = Some(Move::Up);
         }
-        let sc = score(g.clone(), Move::Down);
+        let sc = score(g.clone(), Move::Down) * 1.05;
         stdout().execute(cursor::MoveTo(1, 13))?;
         write!(stdout(), "DOWN: {}", sc)?;
         if sc > best {
             best = sc;
             mv = Some(Move::Down);
         }
-        let sc = score(g.clone(), Move::Left);
+        let sc = score(g.clone(), Move::Left) * 1.05;
         stdout().execute(cursor::MoveTo(1, 14))?;
         write!(stdout(), "LEFT: {}", sc)?;
         if sc > best {
@@ -198,37 +210,13 @@ fn main() -> io::Result<()> {
         if sc > best {
             best = sc;
             mv = Some(Move::Right);
-        } /*
-          loop {
-              match read()? {
-                  Event::Key(KeyEvent {
-                      code: KeyCode::Esc,
-                      kind: KeyEventKind::Press,
-                      ..
-                  })
-                  | Event::Key(KeyEvent {
-                      code: KeyCode::Char('q'),
-                      kind: KeyEventKind::Press,
-                      ..
-                  }) => {
-                      break 'outer;
-                  }
-                  Event::Key(KeyEvent {
-                      kind: KeyEventKind::Press,
-                      ..
-                  }) => {}
-                  _ => {
-                      break;
-                  }
-              }
-          }
-          */
+        }
         match mv {
             Some(Move::Up) => g.up().ok(),
             Some(Move::Down) => g.down().ok(),
             Some(Move::Left) => g.left().ok(),
             Some(Move::Right) => g.right().ok(),
-            None => unreachable!(),
+            None => continue,
         };
     }
     stdout().execute(crossterm::style::ResetColor)?;
